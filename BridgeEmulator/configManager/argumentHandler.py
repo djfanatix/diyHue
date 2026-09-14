@@ -16,10 +16,14 @@ def get_environment_variable(var, boolean=False):
     return value
 
 
-def generate_certificate(mac, path):
+def generate_certificate(mac, config_dir):
     logging.info("Generating certificate")
     serial = (mac[:6] + "fffe" + mac[-6:]).encode('utf-8')
-    call(["/bin/bash", "/opt/hue-emulator/genCert.sh", serial, path])
+    script_dir = path.abspath(path.join(path.dirname(path.dirname(__file__)), ""))
+    script_path = path.join(script_dir, "genCert.sh")
+    if not path.isfile(script_path):
+        raise FileNotFoundError(f"Certificate generation script not found: {script_path}")
+    call(["/bin/bash", script_path, serial.decode("utf-8"), config_dir])
     logging.info("Certificate created")
 
 
@@ -75,6 +79,8 @@ def parse_arguments():
         config_path = args.config_path
     elif get_environment_variable('CONFIG_PATH'):
         config_path = get_environment_variable('CONFIG_PATH')
+    elif not (args.docker or get_environment_variable('DOCKER', True)):
+        config_path = path.abspath(path.join(path.dirname(path.dirname(__file__)), "config"))
     else:
         config_path = '/opt/hue-emulator/config'
     argumentDict["CONFIG_PATH"] = config_path

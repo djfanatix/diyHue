@@ -5,7 +5,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple, Union, Generator
-from lights.protocols import tpkasa, wled, mqtt, hyperion, yeelight, hue, hue_bl, deconz, native_multi, tasmota, shelly, esphome, tradfri, elgato, govee
+from lights.protocols import tpkasa, wled, mqtt, hyperion, yeelight, hue, hue_bl, deconz, native_multi, tasmota, shelly, esphome, tradfri, elgato, govee, twinkly
 from services import homeAssistantWS
 from HueObjects import Light, StreamEvent
 from functions.core import nextFreeId
@@ -127,8 +127,18 @@ def manualAddLight(ip: str, protocol: str, config: Dict = {}) -> None:
     name = config.get("lightName", "New Light")
     if protocol == "auto":
         detectedLights = []
-        for discover_func in [native_multi.discover, tasmota.discover, shelly.discover, esphome.discover]:
-            discover_func(detectedLights, [ip])
+        discover_funcs = [native_multi.discover, tasmota.discover, shelly.discover, esphome.discover, twinkly.discover]
+        for discover_func in discover_funcs:
+            try:
+                discover_func(detectedLights, [ip])
+            except Exception as exc:
+                logging.warning("Manual discovery failed for %s: %s", discover_func.__module__, exc)
+        for light in detectedLights:
+            logging.info(f"Found light {light['protocol']} {light['name']}")
+            addNewLight(light["modelid"], light["name"], light["protocol"], light["protocol_cfg"])
+    elif protocol == "twinkly":
+        detectedLights = []
+        twinkly.discover(detectedLights, [ip])
         for light in detectedLights:
             logging.info(f"Found light {light['protocol']} {light['name']}")
             addNewLight(light["modelid"], light["name"], light["protocol"], light["protocol_cfg"])
@@ -243,6 +253,8 @@ def discover_lights(detectedLights: List[Dict], device_ips: List[str]) -> None:
     # native_multi probe all esp8266 lights with firmware from diyhue repo
     if bridgeConfig["config"]["native_multi"]["enabled"]:
         native_multi.discover(detectedLights, device_ips)
+    if bridgeConfig["config"].get("twinkly", {}).get("enabled", True):
+        twinkly.discover(detectedLights, device_ips)
     if bridgeConfig["config"]["tasmota"]["enabled"]:
         tasmota.discover(detectedLights, device_ips)
     if bridgeConfig["config"]["wled"]["enabled"]:

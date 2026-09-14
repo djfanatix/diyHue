@@ -76,7 +76,8 @@ class NewUser(Resource):
         logging.info(postDict)
         if "devicetype" in postDict:
             last_button_press = bridgeConfig["config"]["linkbutton"]["lastlinkbuttonpushed"]
-            if last_button_press + 30 >= datetime.now().timestamp(): # 30 sec offset
+            link_button_disabled = configManager.runtimeConfig.arg.get("noLinkButton", False)
+            if link_button_disabled or last_button_press + 30 >= datetime.now().timestamp(): # 30 sec offset
                 username = str(uuid.uuid1()).replace('-', '')
                 if postDict["devicetype"].startswith("Hue Essentials"):
                     username = "hueess" + username[-26:]
